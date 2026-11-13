@@ -6,6 +6,14 @@ class SupabaseConfig {
   static const String defaultUrl = 'https://demo-growthos.supabase.co';
   static const String defaultAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
 
+  static bool get isConfigured {
+    try {
+      return Supabase.instance.client != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<void> initialize({String? url, String? anonKey}) async {
     try {
       await Supabase.initialize(
@@ -25,7 +33,6 @@ class SupabaseConfig {
     try {
       return Supabase.instance.client;
     } catch (_) {
-      // In tests or mock environments without cloud initialization
       throw Exception('Supabase client not initialized. Offline mode will be used.');
     }
   }
@@ -42,4 +49,3 @@ class SupabaseConfig {
     return currentUser != null;
   }
 }
-
