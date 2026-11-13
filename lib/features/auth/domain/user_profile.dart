@@ -9,6 +9,7 @@ class UserProfile {
   final double monthlyEarningTarget;
   final double annualEarningTarget;
   final String primaryCategory;
+  String get primaryBusinessCategory => primaryCategory;
   final String preferredCurrency;
   final String timeZone;
   final bool isAdmin;
