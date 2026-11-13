@@ -11,6 +11,8 @@ class AuthState {
   final UserProfile? userProfile;
   final String? errorMessage;
 
+  UserProfile? get user => userProfile;
+
   const AuthState({
     required this.status,
     this.userProfile,
