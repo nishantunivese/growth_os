@@ -86,8 +86,6 @@ class NotificationService {
       icon: '@mipmap/ic_launcher',
     );
 
-    const details = NotificationSettings(android: androidDetails);
-
     try {
       await _notificationsPlugin.show(
         id,
