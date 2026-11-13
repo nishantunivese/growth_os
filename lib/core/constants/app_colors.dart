@@ -20,6 +20,14 @@ class AppColors {
   static const Color amberWarning = Color(0xFFF59E0B);
   static const Color roseDanger = Color(0xFFF43F5E);
 
+  // Semantic Aliases
+  static const Color primary = electricPurple;
+  static const Color secondary = cyberCyan;
+  static const Color success = emeraldGreen;
+  static const Color warning = amberWarning;
+  static const Color danger = roseDanger;
+  static const Color surface = cardSurface;
+
   // Typography Colors
   static const Color textPrimary = Color(0xFFF8FAFC);
   static const Color textSecondary = Color(0xFF94A3B8);
@@ -51,4 +59,3 @@ class AppColors {
     end: Alignment.bottomRight,
   );
 }
-
