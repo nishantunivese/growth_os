@@ -9,6 +9,21 @@ class LocalDbService {
   LocalDbService._();
   static final LocalDbService instance = LocalDbService._();
 
+  static Future<List<Map<String, dynamic>>> query(String table, {String? where, List<dynamic>? whereArgs}) async {
+    final db = await instance.database;
+    return await db.query(table, where: where, whereArgs: whereArgs);
+  }
+
+  static Future<void> upsert(String table, Map<String, dynamic> data) async {
+    final db = await instance.database;
+    await db.insert(table, data, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  static Future<int> delete(String table, {String? where, List<dynamic>? whereArgs}) async {
+    final db = await instance.database;
+    return await db.delete(table, where: where, whereArgs: whereArgs);
+  }
+
   static Database? _database;
 
   Future<Database> get database async {
