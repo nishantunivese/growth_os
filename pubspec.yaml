@@ -31,7 +31,7 @@ dependencies:
 
   # Media & Hardware
   image_picker: ^1.1.1
-  record: ^5.1.2
+  record: any
   audioplayers: ^6.0.0
 
   # Notifications & Scheduling
