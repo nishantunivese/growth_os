@@ -5,6 +5,7 @@ import '../../admin/presentation/admin_panel_screen.dart';
 import '../../ai_assistant/presentation/growth_intelligence_screen.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../auth/presentation/welcome_screen.dart';
+import '../../rewards/presentation/rewards_dashboard_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -156,6 +157,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const SizedBox(height: 16),
 
           // 4. AI & Administrative Shortcuts
+          ListTile(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: AppColors.cardBorder)),
+            tileColor: AppColors.surface,
+            leading: const Icon(Icons.monetization_on_rounded, color: AppColors.goldCoin),
+            title: const Text('Gold Coins & Rewards Dashboard', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+            subtitle: const Text('View verified tasks, daily coin progress & withdraw funds', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+            trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const RewardsDashboardScreen()));
+            },
+          ),
+          const SizedBox(height: 10),
           ListTile(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: AppColors.cardBorder)),
             tileColor: AppColors.surface,

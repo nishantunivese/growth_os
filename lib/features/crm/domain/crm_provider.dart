@@ -20,15 +20,17 @@ class CrmNotifier extends StateNotifier<AsyncValue<List<Client>>> {
   Future<void> loadClients() async {
     state = const AsyncValue.loading();
     try {
-      final maps = await LocalDbService.instance.getClients();
+      final maps = await LocalDbService.instance.getClients(userId: userId);
       if (maps.isNotEmpty) {
         state = AsyncValue.data(maps.map((m) => Client.fromMap(m)).toList());
-      } else {
+      } else if (userId == 'demo-creator-id-001') {
         final sampleClients = _getSampleClients();
         for (var c in sampleClients) {
           await LocalDbService.instance.upsertClient(c.toMap());
         }
         state = AsyncValue.data(sampleClients);
+      } else {
+        state = const AsyncValue.data([]);
       }
 
       if (SupabaseConfig.isConfigured) {

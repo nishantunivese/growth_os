@@ -5,6 +5,8 @@ import '../work/presentation/work_screen.dart';
 import '../finance/presentation/goals_screen.dart';
 import '../growth_center/presentation/growth_center_screen.dart';
 import '../profile/presentation/profile_screen.dart';
+import '../rewards/presentation/rewards_dashboard_screen.dart';
+import '../tasks/presentation/add_task_dialog.dart';
 
 class MainScaffold extends StatefulWidget {
   final int initialIndex;
@@ -62,6 +64,36 @@ class _MainScaffoldState extends State<MainScaffold> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
                 ),
                 const SizedBox(height: 16),
+                _buildQuickActionItem(
+                  icon: Icons.assignment_add,
+                  color: AppColors.electricPurpleLight,
+                  title: 'Add Work Task',
+                  sub: 'Create a deliverable task & submit proof for rewards',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const AddTaskDialog(),
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                _buildQuickActionItem(
+                  icon: Icons.monetization_on_rounded,
+                  color: AppColors.goldCoin,
+                  title: 'Gold Coins & Withdrawals',
+                  sub: 'View earned coins, daily progress & withdraw to UPI',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RewardsDashboardScreen()),
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
                 _buildQuickActionItem(
                   icon: Icons.currency_rupee_rounded,
                   color: AppColors.emeraldGreen,

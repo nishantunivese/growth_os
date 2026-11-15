@@ -70,14 +70,14 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
     state = state.copyWith(isLoading: true);
 
     try {
-      final incomeMaps = await LocalDbService.instance.getIncome();
-      final expenseMaps = await LocalDbService.instance.getExpenses();
+      final incomeMaps = await LocalDbService.instance.getIncome(userId: userId);
+      final expenseMaps = await LocalDbService.instance.getExpenses(userId: userId);
 
       List<IncomeEntry> incomes = incomeMaps.map((m) => IncomeEntry.fromMap(m)).toList();
       List<ExpenseEntry> expenses = expenseMaps.map((m) => ExpenseEntry.fromMap(m)).toList();
 
-      // Seed initial realistic entrepreneurial data if empty
-      if (incomes.isEmpty) {
+      // Seed initial data ONLY for the built-in demo user
+      if (incomes.isEmpty && userId == 'demo-creator-id-001') {
         final now = DateTime.now();
         incomes = [
           IncomeEntry(
@@ -126,7 +126,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         }
       }
 
-      if (expenses.isEmpty) {
+      if (expenses.isEmpty && userId == 'demo-creator-id-001') {
         final now = DateTime.now();
         expenses = [
           ExpenseEntry(
@@ -160,30 +160,33 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         }
       }
 
-      // Default monthly and yearly goals
-      final now = DateTime.now();
-      final goals = [
-        FinancialGoal(
-          id: 'goal-month-1',
-          userId: userId,
-          title: 'Monthly Earning Target',
-          period: GoalPeriod.monthly,
-          targetAmount: 100000.0,
-          currentAmount: incomes.fold(0.0, (sum, item) => sum + item.amount),
-          startDate: DateTime(now.year, now.month, 1),
-          endDate: DateTime(now.year, now.month + 1, 0),
-        ),
-        FinancialGoal(
-          id: 'goal-year-1',
-          userId: userId,
-          title: 'Annual Scale Goal',
-          period: GoalPeriod.yearly,
-          targetAmount: 1200000.0,
-          currentAmount: incomes.fold(0.0, (sum, item) => sum + item.amount),
-          startDate: DateTime(now.year, 1, 1),
-          endDate: DateTime(now.year, 12, 31),
-        ),
-      ];
+      // Default monthly and yearly goals (only for demo user, empty for new users)
+      List<FinancialGoal> goals = [];
+      if (userId == 'demo-creator-id-001') {
+        final now = DateTime.now();
+        goals = [
+          FinancialGoal(
+            id: 'goal-month-1',
+            userId: userId,
+            title: 'Monthly Earning Target',
+            period: GoalPeriod.monthly,
+            targetAmount: 100000.0,
+            currentAmount: incomes.fold(0.0, (sum, item) => sum + item.amount),
+            startDate: DateTime(now.year, now.month, 1),
+            endDate: DateTime(now.year, now.month + 1, 0),
+          ),
+          FinancialGoal(
+            id: 'goal-year-1',
+            userId: userId,
+            title: 'Annual Scale Goal',
+            period: GoalPeriod.yearly,
+            targetAmount: 1200000.0,
+            currentAmount: incomes.fold(0.0, (sum, item) => sum + item.amount),
+            startDate: DateTime(now.year, 1, 1),
+            endDate: DateTime(now.year, 12, 31),
+          ),
+        ];
+      }
 
       final summary = _calculateSummary(incomes, expenses);
 

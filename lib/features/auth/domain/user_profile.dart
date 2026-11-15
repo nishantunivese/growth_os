@@ -1,5 +1,6 @@
 class UserProfile {
   final String id;
+  final String email;
   final String fullName;
   final String businessName;
   final String avatarUrl;
@@ -14,9 +15,18 @@ class UserProfile {
   final String timeZone;
   final bool isAdmin;
   final int streakCount;
+  final String status; // 'active', 'suspended', 'banned'
+  final String suspensionReason;
+  final String adminNotes;
+  final String createdAt;
+
+  bool get isSuspended => status == 'suspended' || status == 'banned';
+  bool get isBanned => status == 'banned';
+  bool get isTemporarilySuspended => status == 'suspended';
 
   UserProfile({
     required this.id,
+    this.email = '',
     required this.fullName,
     this.businessName = '',
     this.avatarUrl = '',
@@ -30,11 +40,16 @@ class UserProfile {
     this.timeZone = 'Asia/Kolkata',
     this.isAdmin = false,
     this.streakCount = 1,
+    this.status = 'active',
+    this.suspensionReason = '',
+    this.adminNotes = '',
+    this.createdAt = '',
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
       id: json['id'] as String,
+      email: json['email'] as String? ?? '',
       fullName: json['full_name'] as String? ?? 'Creator',
       businessName: json['business_name'] as String? ?? '',
       avatarUrl: json['avatar_url'] as String? ?? '',
@@ -48,12 +63,17 @@ class UserProfile {
       timeZone: json['time_zone'] as String? ?? 'Asia/Kolkata',
       isAdmin: json['is_admin'] == 1 || json['is_admin'] == true,
       streakCount: (json['streak_count'] as num?)?.toInt() ?? 1,
+      status: json['status'] as String? ?? 'active',
+      suspensionReason: json['suspension_reason'] as String? ?? '',
+      adminNotes: json['admin_notes'] as String? ?? '',
+      createdAt: json['created_at'] as String? ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'email': email,
       'full_name': fullName,
       'business_name': businessName,
       'avatar_url': avatarUrl,
@@ -67,12 +87,17 @@ class UserProfile {
       'time_zone': timeZone,
       'is_admin': isAdmin ? 1 : 0,
       'streak_count': streakCount,
+      'status': status,
+      'suspension_reason': suspensionReason,
+      'admin_notes': adminNotes,
+      'created_at': createdAt,
     };
   }
 
   Map<String, dynamic> toLocalDbMap() {
     return {
       'id': id,
+      'email': email,
       'full_name': fullName,
       'business_name': businessName,
       'avatar_url': avatarUrl,
@@ -86,10 +111,15 @@ class UserProfile {
       'time_zone': timeZone,
       'is_admin': isAdmin ? 1 : 0,
       'streak_count': streakCount,
+      'status': status,
+      'suspension_reason': suspensionReason,
+      'admin_notes': adminNotes,
+      'created_at': createdAt,
     };
   }
 
   UserProfile copyWith({
+    String? email,
     String? fullName,
     String? businessName,
     String? avatarUrl,
@@ -103,9 +133,14 @@ class UserProfile {
     String? timeZone,
     bool? isAdmin,
     int? streakCount,
+    String? status,
+    String? suspensionReason,
+    String? adminNotes,
+    String? createdAt,
   }) {
     return UserProfile(
       id: id,
+      email: email ?? this.email,
       fullName: fullName ?? this.fullName,
       businessName: businessName ?? this.businessName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
@@ -119,6 +154,10 @@ class UserProfile {
       timeZone: timeZone ?? this.timeZone,
       isAdmin: isAdmin ?? this.isAdmin,
       streakCount: streakCount ?? this.streakCount,
+      status: status ?? this.status,
+      suspensionReason: suspensionReason ?? this.suspensionReason,
+      adminNotes: adminNotes ?? this.adminNotes,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

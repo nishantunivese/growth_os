@@ -60,6 +60,17 @@ class GrowthCenterNotifier extends StateNotifier<GrowthCenterState> {
   }
 
   void loadData() {
+    if (userId != 'demo-creator-id-001') {
+      state = state.copyWith(
+        contentItems: [],
+        audienceMetrics: [],
+        funnels: [],
+        leads: [],
+        campaigns: [],
+        isLoading: false,
+      );
+      return;
+    }
     final now = DateTime.now();
 
     // 1. Content Calendar Items

@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../../core/network/supabase_config.dart';
-import '../../../../core/database/local_db_service.dart';
+import '../../../core/network/supabase_config.dart';
+import '../../../core/database/local_db_service.dart';
 import 'user_profile.dart';
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
@@ -37,18 +36,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> checkCurrentSession() async {
     state = AuthState.loading();
     try {
-      // 1. Check local offline cache first
-      final cached = await LocalDbService.query('local_profiles');
-      if (cached.isNotEmpty) {
-        final profile = UserProfile.fromJson(cached.first);
+      // 1. Check active session user ID from SQLite
+      final activeUserId = await LocalDbService.instance.getActiveSessionUserId();
+      if (activeUserId != null && activeUserId.isNotEmpty) {
+        final cached = await LocalDbService.query(
+          'local_profiles',
+          where: 'id = ?',
+          whereArgs: [activeUserId],
+        );
+        if (cached.isNotEmpty) {
+          final profile = UserProfile.fromJson(cached.first);
+          state = AuthState.authenticated(profile);
+          return;
+        }
+      }
+
+      // 2. Fallback to first profile if only 1 exists
+      final allCached = await LocalDbService.query('local_profiles');
+      if (allCached.isNotEmpty) {
+        final profile = UserProfile.fromJson(allCached.first);
+        await LocalDbService.instance.setActiveSession(profile.id);
         state = AuthState.authenticated(profile);
         return;
       }
 
-      // 2. Check Supabase session if online
+      // 3. Check Supabase session if online
       final user = SupabaseConfig.currentUser;
       if (user != null) {
         final profile = await _fetchProfile(user.id);
+        await LocalDbService.instance.setActiveSession(profile.id);
         state = AuthState.authenticated(profile);
       } else {
         state = AuthState.unauthenticated();
@@ -62,62 +78,134 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = AuthState.loading();
     final cleanEmail = email.trim().toLowerCase();
 
-    // 1. Instant check for demo / test credentials
+    // 1. Instant check for demo credentials
     if (cleanEmail == 'demo@growthos.app' ||
-        cleanEmail == 'admin@growthos.app' ||
         cleanEmail == 'nishant@growthos.app' ||
         cleanEmail == 'creator@business.com') {
       return await signInDemo();
     }
 
+    // 2. Check local users database for registered user
+    try {
+      final userRows = await LocalDbService.query(
+        'users',
+        where: 'LOWER(email) = ?',
+        whereArgs: [cleanEmail],
+      );
+      if (userRows.isNotEmpty) {
+        final userRow = userRows.first;
+        final storedPass = userRow['password_hash'] as String? ?? '';
+        if (storedPass == password || storedPass.isEmpty) {
+          final userId = userRow['id'] as String;
+          final profileRows = await LocalDbService.query(
+            'local_profiles',
+            where: 'id = ?',
+            whereArgs: [userId],
+          );
+          UserProfile profile;
+          if (profileRows.isNotEmpty) {
+            profile = UserProfile.fromJson(profileRows.first);
+          } else {
+            profile = UserProfile(
+              id: userId,
+              email: cleanEmail,
+              fullName: userRow['full_name'] as String? ?? 'User',
+              status: userRow['status'] as String? ?? 'active',
+              suspensionReason: userRow['suspension_reason'] as String? ?? '',
+            );
+            await LocalDbService.upsert('local_profiles', profile.toLocalDbMap());
+          }
+
+          await LocalDbService.instance.setActiveSession(profile.id);
+          await LocalDbService.instance.logUserActivity(
+            profile.id,
+            'login',
+            'User logged in with email: $cleanEmail',
+          );
+          state = AuthState.authenticated(profile);
+          return true;
+        } else {
+          state = AuthState.error('Invalid password for this account.');
+          return false;
+        }
+      }
+    } catch (_) {}
+
+    // 3. Supabase online auth check
     try {
       final res = await SupabaseConfig.client.auth.signInWithPassword(
-        email: email.trim(),
+        email: cleanEmail,
         password: password,
       );
       if (res.user != null) {
         final profile = await _fetchProfile(res.user!.id);
+        await LocalDbService.instance.setActiveSession(profile.id);
         state = AuthState.authenticated(profile);
         return true;
       }
     } catch (_) {}
 
-    // 2. Check if a local profile already exists in SQLite
+    // 4. Check existing local_profiles table directly
     try {
-      final cached = await LocalDbService.query('local_profiles');
+      final cached = await LocalDbService.query(
+        'local_profiles',
+        where: 'LOWER(email) = ?',
+        whereArgs: [cleanEmail],
+      );
       if (cached.isNotEmpty) {
         final profile = UserProfile.fromJson(cached.first);
+        await LocalDbService.instance.setActiveSession(profile.id);
         state = AuthState.authenticated(profile);
         return true;
       }
     } catch (_) {}
 
-    // 3. Fallback: Always succeed with a personalized creator profile!
+    // 5. Fallback for offline fresh registration/login:
     final namePart = cleanEmail.contains('@') ? cleanEmail.split('@').first : cleanEmail;
     final formattedName = namePart.isNotEmpty
         ? namePart[0].toUpperCase() + namePart.substring(1)
-        : 'Creator Pro';
+        : 'Growth Creator';
 
-    final fallbackProfile = UserProfile(
-      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+    final newUserId = 'user_${DateTime.now().millisecondsSinceEpoch}';
+    final freshProfile = UserProfile(
+      id: newUserId,
+      email: cleanEmail,
       fullName: formattedName,
-      businessName: '$formattedName Media Studio',
-      primaryCategory: 'Content Creator & Coach',
+      businessName: '',
+      primaryCategory: 'Digital Creator',
       preferredCurrency: '₹',
-      monthlyEarningTarget: 200000.0,
-      annualEarningTarget: 2400000.0,
-      streakCount: 3,
+      monthlyEarningTarget: 100000.0,
+      annualEarningTarget: 1200000.0,
+      streakCount: 1,
+      status: 'active',
+      createdAt: DateTime.now().toIso8601String(),
     );
-    await LocalDbService.upsert('local_profiles', fallbackProfile.toJson());
-    state = AuthState.authenticated(fallbackProfile);
+
+    // Save to users and local_profiles
+    await LocalDbService.upsert('users', {
+      'id': newUserId,
+      'email': cleanEmail,
+      'password_hash': password,
+      'full_name': formattedName,
+      'role': 'user',
+      'status': 'active',
+      'created_at': DateTime.now().toIso8601String(),
+    });
+    await LocalDbService.upsert('local_profiles', freshProfile.toLocalDbMap());
+    await LocalDbService.instance.getCoinBalance(newUserId); // initialize coins at 0
+    await LocalDbService.instance.setActiveSession(newUserId);
+
+    state = AuthState.authenticated(freshProfile);
     return true;
   }
 
   Future<bool> signInDemo() async {
     state = AuthState.loading();
-    // Instant zero-friction demo user
+    const demoId = 'demo-creator-id-001';
+
     final demoProfile = UserProfile(
-      id: 'demo-creator-id-001',
+      id: demoId,
+      email: 'demo@growthos.app',
       fullName: 'Alex Morgan',
       businessName: 'Vanguard Media & Courses',
       youtubeChannel: '@AlexVanguard',
@@ -129,11 +217,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
       preferredCurrency: '₹',
       streakCount: 14,
       isAdmin: true,
+      status: 'active',
+      createdAt: DateTime.now().subtract(const Duration(days: 60)).toIso8601String(),
     );
 
-    // Save locally with safe exception handling
     try {
+      await LocalDbService.upsert('users', {
+        'id': demoId,
+        'email': 'demo@growthos.app',
+        'password_hash': 'password123',
+        'full_name': 'Alex Morgan',
+        'role': 'user',
+        'status': 'active',
+        'created_at': demoProfile.createdAt,
+      });
       await LocalDbService.upsert('local_profiles', demoProfile.toLocalDbMap());
+      await LocalDbService.instance.setActiveSession(demoId);
+      await LocalDbService.instance.logUserActivity(demoId, 'login', 'Demo user session started');
     } catch (_) {}
 
     state = AuthState.authenticated(demoProfile);
@@ -142,50 +242,87 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<bool> signUp(String name, String email, String password) async {
     state = AuthState.loading();
+    final cleanEmail = email.trim().toLowerCase();
+    final validName = name.trim().isNotEmpty ? name.trim() : 'Digital Creator';
+    final newUserId = 'user_${DateTime.now().millisecondsSinceEpoch}';
+    final nowIso = DateTime.now().toIso8601String();
+
     try {
       final res = await SupabaseConfig.client.auth.signUp(
-        email: email.trim(),
+        email: cleanEmail,
         password: password,
-        data: {'full_name': name.trim()},
+        data: {'full_name': validName},
       );
       if (res.user != null) {
         final profile = UserProfile(
           id: res.user!.id,
-          fullName: name.trim(),
+          email: cleanEmail,
+          fullName: validName,
+          status: 'active',
+          createdAt: nowIso,
         );
-        await LocalDbService.upsert('local_profiles', profile.toJson());
+        await LocalDbService.upsert('users', {
+          'id': res.user!.id,
+          'email': cleanEmail,
+          'password_hash': password,
+          'full_name': validName,
+          'role': 'user',
+          'status': 'active',
+          'created_at': nowIso,
+        });
+        await LocalDbService.upsert('local_profiles', profile.toLocalDbMap());
+        await LocalDbService.instance.getCoinBalance(res.user!.id);
+        await LocalDbService.instance.setActiveSession(res.user!.id);
         state = AuthState.authenticated(profile);
         return true;
       }
     } catch (_) {}
 
-    // Offline mode: Always succeed and save profile locally in SQLite
-    final validName = name.trim().isNotEmpty ? name.trim() : 'Digital Creator';
-    final profile = UserProfile(
-      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+    // Offline registration: 100% fresh account with ZERO pre-added data!
+    final freshProfile = UserProfile(
+      id: newUserId,
+      email: cleanEmail,
       fullName: validName,
-      businessName: '$validName Media',
-      primaryCategory: 'Content Creator & Coach',
+      businessName: '',
+      primaryCategory: 'Digital Creator',
       preferredCurrency: '₹',
-      monthlyEarningTarget: 150000.0,
-      annualEarningTarget: 1800000.0,
+      monthlyEarningTarget: 100000.0,
+      annualEarningTarget: 1200000.0,
       streakCount: 1,
+      status: 'active',
+      createdAt: nowIso,
     );
-    await LocalDbService.upsert('local_profiles', profile.toJson());
-    state = AuthState.authenticated(profile);
+
+    await LocalDbService.upsert('users', {
+      'id': newUserId,
+      'email': cleanEmail,
+      'password_hash': password,
+      'full_name': validName,
+      'role': 'user',
+      'status': 'active',
+      'created_at': nowIso,
+    });
+    await LocalDbService.upsert('local_profiles', freshProfile.toLocalDbMap());
+    await LocalDbService.instance.getCoinBalance(newUserId); // initial 0 coins
+    await LocalDbService.instance.setActiveSession(newUserId);
+    await LocalDbService.instance.logUserActivity(
+      newUserId,
+      'register',
+      'New fresh user registered: $validName ($cleanEmail)',
+    );
+
+    state = AuthState.authenticated(freshProfile);
     return true;
   }
 
   Future<void> updateProfile(UserProfile updated) async {
     try {
-      await LocalDbService.upsert('local_profiles', updated.toJson());
+      await LocalDbService.upsert('local_profiles', updated.toLocalDbMap());
       try {
         await SupabaseConfig.client
             .from('profiles')
             .upsert(updated.toJson());
-      } catch (_) {
-        // Will sync when online
-      }
+      } catch (_) {}
       state = AuthState.authenticated(updated);
     } catch (e) {
       state = AuthState.error('Failed to update profile');
@@ -196,7 +333,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       await SupabaseConfig.client.auth.signOut();
     } catch (_) {}
-    await LocalDbService.delete('local_profiles');
+    // Clear only active session marker, preserving account data for next login!
+    await LocalDbService.instance.clearActiveSession();
     state = AuthState.unauthenticated();
   }
 
@@ -208,10 +346,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
           .eq('id', userId)
           .single();
       final profile = UserProfile.fromJson(res);
-      await LocalDbService.upsert('local_profiles', profile.toJson());
+      await LocalDbService.upsert('local_profiles', profile.toLocalDbMap());
       return profile;
     } catch (_) {
-      final cached = await LocalDbService.query('local_profiles');
+      final cached = await LocalDbService.query(
+        'local_profiles',
+        where: 'id = ?',
+        whereArgs: [userId],
+      );
       if (cached.isNotEmpty) {
         return UserProfile.fromJson(cached.first);
       }

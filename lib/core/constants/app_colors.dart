@@ -19,6 +19,9 @@ class AppColors {
   static const Color emeraldGreenLight = Color(0xFF34D399);
   static const Color amberWarning = Color(0xFFF59E0B);
   static const Color roseDanger = Color(0xFFF43F5E);
+  static const Color goldCoin = Color(0xFFFFB800);
+  static const Color goldCoinLight = Color(0xFFFDE047);
+  static const Color goldCoinDark = Color(0xFFD97706);
 
   // Semantic Aliases
   static const Color primary = electricPurple;

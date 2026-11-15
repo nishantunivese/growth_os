@@ -20,12 +20,12 @@ class ProjectsNotifier extends StateNotifier<AsyncValue<List<Project>>> {
   Future<void> loadProjects() async {
     state = const AsyncValue.loading();
     try {
-      final localMaps = await LocalDbService.instance.getProjects();
+      final localMaps = await LocalDbService.instance.getProjects(userId: userId);
       if (localMaps.isNotEmpty) {
         final list = localMaps.map((m) => Project.fromMap(m)).toList();
         state = AsyncValue.data(list);
-      } else {
-        // Initialize with default template projects if completely empty
+      } else if (userId == 'demo-creator-id-001') {
+        // Initialize with default template projects ONLY for demo user
         final initialProjects = _getDefaultProjects();
         for (var p in initialProjects) {
           await LocalDbService.instance.upsertProject(p.toMap());
@@ -33,6 +33,9 @@ class ProjectsNotifier extends StateNotifier<AsyncValue<List<Project>>> {
           _createDefaultStagesForProject(p.id, p.platformCategory);
         }
         state = AsyncValue.data(initialProjects);
+      } else {
+        // Fresh user gets completely clean and empty project list
+        state = const AsyncValue.data([]);
       }
 
       // Sync with Supabase if online
