@@ -25,28 +25,28 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Generate Gradle Wrapper (without overwriting our Android config)
+      - name: Generate Gradle Wrapper & Restore Custom Android Config
         run: |
-          # Save our custom Android files before flutter create overwrites them
-          cp android/app/build.gradle /tmp/app_build.gradle.bak
-          cp android/build.gradle /tmp/root_build.gradle.bak
-          cp android/settings.gradle /tmp/settings.gradle.bak
-          cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml.bak
-          cp android/app/src/main/kotlin/com/growthos/app/MainActivity.kt /tmp/MainActivity.kt.bak
+          # Backup our custom Android files (only if they exist in repo)
+          [ -f android/app/build.gradle ] && cp android/app/build.gradle /tmp/app_build.gradle.bak
+          [ -f android/build.gradle ] && cp android/build.gradle /tmp/root_build.gradle.bak
+          [ -f android/settings.gradle ] && cp android/settings.gradle /tmp/settings.gradle.bak
+          [ -f android/app/src/main/AndroidManifest.xml ] && cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml.bak
+          [ -f android/app/src/main/kotlin/com/growthos/app/MainActivity.kt ] && cp android/app/src/main/kotlin/com/growthos/app/MainActivity.kt /tmp/MainActivity.kt.bak
 
-          # Run flutter create to generate gradle wrapper + local.properties
+          # Run flutter create to generate gradle wrapper + local.properties + icons
           flutter create . --platforms=android --org com.growthos.app
 
           # Restore our custom files (overwrite what flutter create just generated)
-          cp /tmp/app_build.gradle.bak android/app/build.gradle
-          cp /tmp/root_build.gradle.bak android/build.gradle
-          cp /tmp/settings.gradle.bak android/settings.gradle
-          cp /tmp/AndroidManifest.xml.bak android/app/src/main/AndroidManifest.xml
-          cp /tmp/MainActivity.kt.bak android/app/src/main/kotlin/com/growthos/app/MainActivity.kt
+          [ -f /tmp/app_build.gradle.bak ] && cp /tmp/app_build.gradle.bak android/app/build.gradle
+          [ -f /tmp/root_build.gradle.bak ] && cp /tmp/root_build.gradle.bak android/build.gradle
+          [ -f /tmp/settings.gradle.bak ] && cp /tmp/settings.gradle.bak android/settings.gradle
+          [ -f /tmp/AndroidManifest.xml.bak ] && cp /tmp/AndroidManifest.xml.bak android/app/src/main/AndroidManifest.xml
+          [ -f /tmp/MainActivity.kt.bak ] && cp /tmp/MainActivity.kt.bak android/app/src/main/kotlin/com/growthos/app/MainActivity.kt
 
-          echo "✅ Gradle wrapper generated, custom Android config restored"
-          echo "--- android/app/build.gradle (minSdkVersion check) ---"
-          grep -E "minSdk|compileSdk|targetSdk" android/app/build.gradle
+          echo "✅ Gradle wrapper generated, custom config restored"
+          echo "--- minSdk check ---"
+          grep -E "minSdk|compileSdk|targetSdk" android/app/build.gradle || true
 
       - name: Get Dependencies
         run: flutter pub get
