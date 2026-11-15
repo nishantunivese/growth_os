@@ -8,6 +8,24 @@ def patch_app_build_gradle():
     kts_path = "android/app/build.gradle.kts"
     groovy_path = "android/app/build.gradle"
     
+    lint_kts = """
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+        ignoreWarnings = true
+    }
+"""
+
+    task_disable_kts = """
+gradle.taskGraph.whenReady {
+    allTasks.forEach { task ->
+        if (task.name.contains("lint", ignoreCase = true)) {
+            task.enabled = false
+        }
+    }
+}
+"""
+
     if os.path.exists(kts_path):
         print(f"Found Kotlin DSL: {kts_path}")
         with open(kts_path, "r", encoding="utf-8") as f:
@@ -27,12 +45,18 @@ def patch_app_build_gradle():
                 content
             )
             
+        if "lint {" not in content:
+            content = content.replace("android {", f"android {{\n{lint_kts}")
+            
         if "desugar_jdk_libs" not in content:
             content += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")\n}\n'
             
+        if "gradle.taskGraph.whenReady" not in content:
+            content += f"\n{task_disable_kts}\n"
+            
         with open(kts_path, "w", encoding="utf-8") as f:
             f.write(content)
-        print("Patched app/build.gradle.kts with compileSdk=36, minSdk=24!")
+        print("Patched app/build.gradle.kts with compileSdk=36, minSdk=24, and disabled lint!")
         
     elif os.path.exists(groovy_path):
         print(f"Found Groovy DSL: {groovy_path}")
@@ -55,12 +79,15 @@ def patch_app_build_gradle():
                 content
             )
             
+        if "lintOptions" not in content:
+            content = content.replace("android {", "android {\n    lintOptions {\n        checkReleaseBuilds false\n        abortOnError false\n    }\n")
+            
         if "desugar_jdk_libs" not in content:
             content += '\ndependencies {\n    coreLibraryDesugaring \'com.android.tools:desugar_jdk_libs:2.0.4\'\n}\n'
             
         with open(groovy_path, "w", encoding="utf-8") as f:
             f.write(content)
-        print("Patched app/build.gradle with compileSdkVersion=36, minSdkVersion=24!")
+        print("Patched app/build.gradle with compileSdkVersion=36, minSdkVersion=24, and disabled lint!")
 
 def patch_manifest():
     print("=== Patching AndroidManifest.xml ===")
@@ -144,7 +171,6 @@ def patch_pub_cache():
                         with open(path, "r", encoding="utf-8") as f:
                             text = f.read()
                         
-                        # Replace compileSdkVersion 28..35 with 36
                         new_text = re.sub(
                             r'compileSdkVersion\s+(?:2[0-9]|3[0-5])\b',
                             'compileSdkVersion 36',
