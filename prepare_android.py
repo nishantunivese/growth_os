@@ -3,6 +3,48 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
+def patch_root_build_gradle():
+    print("=== Patching root build.gradle(.kts) to disable lint globally ===")
+    root_kts = "android/build.gradle.kts"
+    root_groovy = "android/build.gradle"
+    
+    lint_disable_kts = """
+subprojects {
+    tasks.configureEach {
+        if (name.contains("lint", ignoreCase = true)) {
+            enabled = false
+        }
+    }
+}
+"""
+
+    lint_disable_groovy = """
+subprojects {
+    tasks.configureEach { task ->
+        if (task.name.toLowerCase().contains("lint")) {
+            task.enabled = false
+        }
+    }
+}
+"""
+
+    if os.path.exists(root_kts):
+        with open(root_kts, "r", encoding="utf-8") as f:
+            content = f.read()
+        if "name.contains(\"lint\"" not in content:
+            content += f"\n{lint_disable_kts}\n"
+            with open(root_kts, "w", encoding="utf-8") as f:
+                f.write(content)
+            print("Injected global lint-disable into root build.gradle.kts!")
+    elif os.path.exists(root_groovy):
+        with open(root_groovy, "r", encoding="utf-8") as f:
+            content = f.read()
+        if "contains(\"lint\"" not in content:
+            content += f"\n{lint_disable_groovy}\n"
+            with open(root_groovy, "w", encoding="utf-8") as f:
+                f.write(content)
+            print("Injected global lint-disable into root build.gradle!")
+
 def patch_app_build_gradle():
     print("=== Patching app/build.gradle(.kts) ===")
     kts_path = "android/app/build.gradle.kts"
@@ -14,16 +56,6 @@ def patch_app_build_gradle():
         abortOnError = false
         ignoreWarnings = true
     }
-"""
-
-    task_disable_kts = """
-gradle.taskGraph.whenReady {
-    allTasks.forEach { task ->
-        if (task.name.contains("lint", ignoreCase = true)) {
-            task.enabled = false
-        }
-    }
-}
 """
 
     if os.path.exists(kts_path):
@@ -50,9 +82,6 @@ gradle.taskGraph.whenReady {
             
         if "desugar_jdk_libs" not in content:
             content += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")\n}\n'
-            
-        if "gradle.taskGraph.whenReady" not in content:
-            content += f"\n{task_disable_kts}\n"
             
         with open(kts_path, "w", encoding="utf-8") as f:
             f.write(content)
@@ -194,6 +223,7 @@ def patch_pub_cache():
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "--all"
     if mode in ("--project-only", "--all"):
+        patch_root_build_gradle()
         patch_app_build_gradle()
         patch_manifest()
     if mode in ("--cache-only", "--all"):
