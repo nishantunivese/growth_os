@@ -80,6 +80,12 @@ def patch_app_build_gradle():
         if "lint {" not in content:
             content = content.replace("android {", f"android {{\n{lint_kts}")
             
+        if "isMinifyEnabled" not in content and "minifyEnabled" not in content:
+            if "release {" in content:
+                content = content.replace("release {", "release {\n            isMinifyEnabled = false\n            isShrinkResources = false")
+            elif "buildTypes {" in content:
+                content = content.replace("buildTypes {", "buildTypes {\n        getByName(\"release\") {\n            isMinifyEnabled = false\n            isShrinkResources = false\n        }")
+            
         if "desugar_jdk_libs" not in content:
             content += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")\n}\n'
             
@@ -110,6 +116,12 @@ def patch_app_build_gradle():
             
         if "lintOptions" not in content:
             content = content.replace("android {", "android {\n    lintOptions {\n        checkReleaseBuilds false\n        abortOnError false\n    }\n")
+            
+        if "minifyEnabled" not in content:
+            if "release {" in content:
+                content = content.replace("release {", "release {\n            minifyEnabled false\n            shrinkResources false")
+            elif "buildTypes {" in content:
+                content = content.replace("buildTypes {", "buildTypes {\n        release {\n            minifyEnabled false\n            shrinkResources false\n        }")
             
         if "desugar_jdk_libs" not in content:
             content += '\ndependencies {\n    coreLibraryDesugaring \'com.android.tools:desugar_jdk_libs:2.0.4\'\n}\n'
@@ -226,40 +238,50 @@ def patch_main_activity():
     if not os.path.exists(kotlin_dir):
         return
         
-    main_activity_code = """package com.growthos.app
+    for root, dirs, files in os.walk(kotlin_dir):
+        for file in files:
+            if file == "MainActivity.kt":
+                path = os.path.join(root, file)
+                with open(path, "r", encoding="utf-8") as f:
+                    orig_content = f.read()
+                
+                # Dynamically extract original package or infer from folder structure
+                pkg_match = re.search(r'package\s+([a-zA-Z0-9_.]+)', orig_content)
+                if pkg_match:
+                    pkg = pkg_match.group(1).strip()
+                else:
+                    rel = os.path.relpath(root, kotlin_dir)
+                    pkg = rel.replace(os.sep, '.').replace('/', '.')
+                print(f"Detected package '{pkg}' for {path}")
+                
+                main_activity_code = f"""package {pkg}
 
 import android.os.Bundle
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 
-class MainActivity: FlutterActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
+class MainActivity: FlutterActivity() {{
+    override fun onCreate(savedInstanceState: Bundle?) {{
         super.onCreate(savedInstanceState)
-        allowScreenshots()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        allowScreenshots()
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        allowScreenshots()
-    }
-
-    private fun allowScreenshots() {
         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-    }
-}
+    }}
+
+    override fun onResume() {{
+        super.onResume()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }}
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {{
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {{
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }}
+    }}
+}}
 """
-    for root, dirs, files in os.walk(kotlin_dir):
-        for file in files:
-            if file == "MainActivity.kt":
-                path = os.path.join(root, file)
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(main_activity_code)
-                print(f"Patched {path} to explicitly allow screenshots!")
+                print(f"Patched {path} with package '{pkg}' to explicitly allow screenshots!")
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "--all"
