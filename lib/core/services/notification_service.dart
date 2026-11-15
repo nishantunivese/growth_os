@@ -91,7 +91,7 @@ class NotificationService {
         id,
         title,
         body,
-        const NotificationDetails(android: androidDetails),
+        NotificationDetails(android: androidDetails),
         payload: payload,
       );
     } catch (_) {}
