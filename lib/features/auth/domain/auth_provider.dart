@@ -60,10 +60,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<bool> signIn(String email, String password) async {
     state = AuthState.loading();
+    final cleanEmail = email.trim().toLowerCase();
+
     // 1. Instant check for demo / test credentials
-    if (email.trim().toLowerCase() == 'demo@growthos.app' ||
-        email.trim().toLowerCase() == 'admin@growthos.app' ||
-        email.trim().toLowerCase() == 'nishant@growthos.app') {
+    if (cleanEmail == 'demo@growthos.app' ||
+        cleanEmail == 'admin@growthos.app' ||
+        cleanEmail == 'nishant@growthos.app' ||
+        cleanEmail == 'creator@business.com') {
       return await signInDemo();
     }
 
@@ -77,11 +80,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
         state = AuthState.authenticated(profile);
         return true;
       }
-      return await signInDemo();
-    } catch (_) {
-      // Offline fallback: allow seamless entry so user is never blocked
-      return await signInDemo();
-    }
+    } catch (_) {}
+
+    // 2. Check if a local profile already exists in SQLite
+    try {
+      final cached = await LocalDbService.query('local_profiles');
+      if (cached.isNotEmpty) {
+        final profile = UserProfile.fromJson(cached.first);
+        state = AuthState.authenticated(profile);
+        return true;
+      }
+    } catch (_) {}
+
+    // 3. Fallback: Always succeed with a personalized creator profile!
+    final namePart = cleanEmail.contains('@') ? cleanEmail.split('@').first : cleanEmail;
+    final formattedName = namePart.isNotEmpty
+        ? namePart[0].toUpperCase() + namePart.substring(1)
+        : 'Creator Pro';
+
+    final fallbackProfile = UserProfile(
+      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+      fullName: formattedName,
+      businessName: '$formattedName Media Studio',
+      primaryCategory: 'Content Creator & Coach',
+      preferredCurrency: '₹',
+      monthlyEarningTarget: 200000.0,
+      annualEarningTarget: 2400000.0,
+      streakCount: 3,
+    );
+    await LocalDbService.upsert('local_profiles', fallbackProfile.toJson());
+    state = AuthState.authenticated(fallbackProfile);
+    return true;
   }
 
   Future<bool> signInDemo() async {
@@ -128,14 +157,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (_) {}
 
     // Offline mode: Always succeed and save profile locally in SQLite
+    final validName = name.trim().isNotEmpty ? name.trim() : 'Digital Creator';
     final profile = UserProfile(
       id: 'local_${DateTime.now().millisecondsSinceEpoch}',
-      fullName: name.trim().isNotEmpty ? name.trim() : 'Digital Creator',
-      businessName: '${name.trim()} Media',
+      fullName: validName,
+      businessName: '$validName Media',
       primaryCategory: 'Content Creator & Coach',
       preferredCurrency: '₹',
-      monthlyEarningTarget: 100000.0,
-      annualEarningTarget: 1200000.0,
+      monthlyEarningTarget: 150000.0,
+      annualEarningTarget: 1800000.0,
       streakCount: 1,
     );
     await LocalDbService.upsert('local_profiles', profile.toJson());
@@ -169,15 +199,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<UserProfile> _fetchProfile(String userId) async {
     try {
-      final data = await SupabaseConfig.client
+      final res = await SupabaseConfig.client
           .from('profiles')
           .select()
           .eq('id', userId)
           .single();
-      final profile = UserProfile.fromJson(data);
+      final profile = UserProfile.fromJson(res);
       await LocalDbService.upsert('local_profiles', profile.toJson());
       return profile;
     } catch (_) {
+      final cached = await LocalDbService.query('local_profiles');
+      if (cached.isNotEmpty) {
+        return UserProfile.fromJson(cached.first);
+      }
       return UserProfile(id: userId, fullName: 'Creator');
     }
   }
@@ -186,4 +220,3 @@ class AuthNotifier extends StateNotifier<AuthState> {
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier();
 });
-
