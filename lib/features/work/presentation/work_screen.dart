@@ -639,7 +639,7 @@ class _WorkScreenState extends ConsumerState<WorkScreen> {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => ProjectDetailScreen(project: p)),
+              MaterialPageRoute(builder: (_) => ProjectDetailScreen(projectId: p.id)),
             );
           },
           child: Padding(
