@@ -1,13 +1,14 @@
 import os
 import re
 import sys
+import xml.etree.ElementTree as ET
 
 def patch_android():
     print("=== Patching Android Configuration ===")
     
-    # 1. Check for build.gradle or build.gradle.kts
-    groovy_path = "android/app/build.gradle"
+    # 1. Check for build.gradle.kts or build.gradle
     kts_path = "android/app/build.gradle.kts"
+    groovy_path = "android/app/build.gradle"
     
     if os.path.exists(kts_path):
         print(f"Found Kotlin DSL: {kts_path}")
@@ -63,23 +64,20 @@ def patch_android():
         with open(groovy_path, "w", encoding="utf-8") as f:
             f.write(content)
         print("Patched app/build.gradle successfully!")
-    else:
-        print("ERROR: Neither app/build.gradle nor app/build.gradle.kts found!")
-        sys.exit(1)
 
-    # 2. Patch AndroidManifest.xml if custom permissions missing
+    # 2. Patch AndroidManifest.xml safely
     manifest_path = "android/app/src/main/AndroidManifest.xml"
     if os.path.exists(manifest_path):
         with open(manifest_path, "r", encoding="utf-8") as f:
             manifest = f.read()
             
-        permissions = """
+        perms = """
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
@@ -88,11 +86,39 @@ def patch_android():
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
 """
+
+        receiver = """
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+"""
+        # Inject permissions before <application
         if "POST_NOTIFICATIONS" not in manifest:
-            manifest = manifest.replace("<manifest", f"<manifest{permissions}")
+            manifest = manifest.replace("<application", perms + "\n    <application")
+            
+        # Inject notification receiver before </application>
+        if "ScheduledNotificationBootReceiver" not in manifest:
+            manifest = manifest.replace("</application>", receiver + "\n    </application>")
+            
+        # Update label
+        manifest = manifest.replace('android:label="growth_os"', 'android:label="GROWTH OS"')
+
+        # Verify XML syntax
+        try:
+            ET.fromstring(manifest.replace('${applicationName}', 'App'))
             with open(manifest_path, "w", encoding="utf-8") as f:
                 f.write(manifest)
-            print("Injected permissions into AndroidManifest.xml")
+            print("Injected permissions and receiver into AndroidManifest.xml (Valid XML confirmed!)")
+        except Exception as e:
+            print(f"XML Validation Error: {e}")
+            sys.exit(1)
             
     print("=== Patch complete! ===")
 
