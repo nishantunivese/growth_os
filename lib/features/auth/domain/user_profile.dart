@@ -46,8 +46,8 @@ class UserProfile {
       primaryCategory: json['primary_category'] as String? ?? 'Digital Creator',
       preferredCurrency: json['preferred_currency'] as String? ?? '₹',
       timeZone: json['time_zone'] as String? ?? 'Asia/Kolkata',
-      isAdmin: json['is_admin'] as bool? ?? false,
-      streakCount: json['streak_count'] as int? ?? 1,
+      isAdmin: json['is_admin'] == 1 || json['is_admin'] == true,
+      streakCount: (json['streak_count'] as num?)?.toInt() ?? 1,
     );
   }
 
