@@ -131,12 +131,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
     } catch (_) {}
 
-    // 3. Supabase online auth check
+    // 3. Supabase online auth check (with timeout to avoid hanging)
     try {
       final res = await SupabaseConfig.client.auth.signInWithPassword(
         email: cleanEmail,
         password: password,
-      );
+      ).timeout(const Duration(seconds: 8));
       if (res.user != null) {
         final profile = await _fetchProfile(res.user!.id);
         await LocalDbService.instance.setActiveSession(profile.id);
@@ -221,22 +221,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
       createdAt: DateTime.now().subtract(const Duration(days: 60)).toIso8601String(),
     );
 
-    try {
-      await LocalDbService.upsert('users', {
-        'id': demoId,
-        'email': 'demo@growthos.app',
-        'password_hash': 'password123',
-        'full_name': 'Alex Morgan',
-        'role': 'user',
-        'status': 'active',
-        'created_at': demoProfile.createdAt,
-      });
-      await LocalDbService.upsert('local_profiles', demoProfile.toLocalDbMap());
-      await LocalDbService.instance.setActiveSession(demoId);
-      await LocalDbService.instance.logUserActivity(demoId, 'login', 'Demo user session started');
-    } catch (_) {}
-
+    // Set state immediately — do NOT wait for DB writes (they happen in background)
     state = AuthState.authenticated(demoProfile);
+
+    // Background DB writes (non-blocking)
+    Future(() async {
+      try {
+        await LocalDbService.upsert('users', {
+          'id': demoId,
+          'email': 'demo@growthos.app',
+          'password_hash': 'password123',
+          'full_name': 'Alex Morgan',
+          'role': 'user',
+          'status': 'active',
+          'created_at': demoProfile.createdAt,
+        });
+        await LocalDbService.upsert('local_profiles', demoProfile.toLocalDbMap());
+        await LocalDbService.instance.setActiveSession(demoId);
+        await LocalDbService.instance.logUserActivity(demoId, 'login', 'Demo user session started');
+      } catch (_) {}
+    });
+
     return true;
   }
 
@@ -252,7 +257,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: cleanEmail,
         password: password,
         data: {'full_name': validName},
-      );
+      ).timeout(const Duration(seconds: 8));
       if (res.user != null) {
         final profile = UserProfile(
           id: res.user!.id,

@@ -83,10 +83,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               // 1-Click Demo Shortcut Box
               InkWell(
-                onTap: () {
-                  _emailController.text = 'demo@growthos.app';
-                  _passwordController.text = 'password123';
-                  _handleLogin();
+                onTap: () async {
+                  if (_isLoading) return;
+                  setState(() => _isLoading = true);
+                  await ref.read(authProvider.notifier).signInDemo();
+                  setState(() => _isLoading = false);
+                  if (mounted) {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const MainScaffold()),
+                    );
+                  }
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
