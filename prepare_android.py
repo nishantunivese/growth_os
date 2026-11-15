@@ -220,11 +220,53 @@ def patch_pub_cache():
                         
     print(f"=== Successfully patched {count} plugin files in pub-cache to compileSdk 36! ===")
 
+def patch_main_activity():
+    print("=== Patching MainActivity.kt to allow screenshots ===")
+    kotlin_dir = "android/app/src/main/kotlin"
+    if not os.path.exists(kotlin_dir):
+        return
+        
+    main_activity_code = """package com.growthos.app
+
+import android.os.Bundle
+import android.view.WindowManager
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity: FlutterActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        allowScreenshots()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        allowScreenshots()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        allowScreenshots()
+    }
+
+    private fun allowScreenshots() {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }
+}
+"""
+    for root, dirs, files in os.walk(kotlin_dir):
+        for file in files:
+            if file == "MainActivity.kt":
+                path = os.path.join(root, file)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(main_activity_code)
+                print(f"Patched {path} to explicitly allow screenshots!")
+
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "--all"
     if mode in ("--project-only", "--all"):
         patch_root_build_gradle()
         patch_app_build_gradle()
         patch_manifest()
+        patch_main_activity()
     if mode in ("--cache-only", "--all"):
         patch_pub_cache()
