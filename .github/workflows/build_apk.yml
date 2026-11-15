@@ -29,15 +29,18 @@ jobs:
         run: |
           rm -rf android/
           flutter create . --platforms=android --org com.growthos.app
-          python3 prepare_android.py
+          python3 prepare_android.py --project-only
           echo "=== Patched build file check ==="
           cat android/app/build.gradle* | grep -E "minSdk|multiDex|compileSdk"
 
       - name: Get Dependencies
         run: flutter pub get
 
+      - name: Patch Dependencies Cache for compileSdk 34
+        run: python3 prepare_android.py --cache-only
+
       - name: Build Android Release APK
-        run: flutter build apk --release --android-skip-build-dependency-validation --verbose
+        run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
