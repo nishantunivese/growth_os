@@ -10,13 +10,22 @@ class LocalDbService {
   static final LocalDbService instance = LocalDbService._();
 
   static Future<List<Map<String, dynamic>>> query(String table, {String? where, List<dynamic>? whereArgs}) async {
-    final db = await instance.database;
-    return await db.query(table, where: where, whereArgs: whereArgs);
+    try {
+      final db = await instance.database;
+      return await db.query(table, where: where, whereArgs: whereArgs);
+    } catch (e) {
+      debugPrint('[LocalDbService Query Error] in $table: $e');
+      return [];
+    }
   }
 
   static Future<void> upsert(String table, Map<String, dynamic> data) async {
-    final db = await instance.database;
-    await db.insert(table, data, conflictAlgorithm: ConflictAlgorithm.replace);
+    try {
+      final db = await instance.database;
+      await db.insert(table, data, conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (e) {
+      debugPrint('[LocalDbService Upsert Error] in $table: $e');
+    }
   }
 
   static Future<int> delete(String table, {String? where, List<dynamic>? whereArgs}) async {
@@ -54,6 +63,7 @@ class LocalDbService {
             annual_earning_target REAL,
             primary_category TEXT,
             preferred_currency TEXT,
+            time_zone TEXT DEFAULT 'Asia/Kolkata',
             streak_count INTEGER,
             is_admin INTEGER DEFAULT 0
           )
