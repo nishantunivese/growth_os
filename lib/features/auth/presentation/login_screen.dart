@@ -86,6 +86,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onTap: () {
                   _emailController.text = 'demo@growthos.app';
                   _passwordController.text = 'password123';
+                  _handleLogin();
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
@@ -101,7 +102,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Tap to auto-fill demo credentials',
+                          'Tap to auto-fill & login to Demo Account',
                           style: TextStyle(color: AppColors.electricPurpleLight, fontSize: 12, fontWeight: FontWeight.w700),
                         ),
                       ),
