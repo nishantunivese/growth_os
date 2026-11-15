@@ -31,8 +31,6 @@ dependencies:
 
   # Media & Hardware
   image_picker: ^1.1.1
-  record: any
-  audioplayers: ^6.0.0
 
   # Notifications & Scheduling
   flutter_local_notifications: ^17.1.2
