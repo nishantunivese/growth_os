@@ -131,8 +131,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       isAdmin: true,
     );
 
-    // Save locally
-    await LocalDbService.upsert('local_profiles', demoProfile.toJson());
+    // Save locally with safe exception handling
+    try {
+      await LocalDbService.upsert('local_profiles', demoProfile.toLocalDbMap());
+    } catch (_) {}
+
     state = AuthState.authenticated(demoProfile);
     return true;
   }
