@@ -25,8 +25,28 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Initialize Android Platform Wrapper
-        run: flutter create . --platforms=android --org com.growthos.app
+      - name: Generate Gradle Wrapper (without overwriting our Android config)
+        run: |
+          # Save our custom Android files before flutter create overwrites them
+          cp android/app/build.gradle /tmp/app_build.gradle.bak
+          cp android/build.gradle /tmp/root_build.gradle.bak
+          cp android/settings.gradle /tmp/settings.gradle.bak
+          cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml.bak
+          cp android/app/src/main/kotlin/com/growthos/app/MainActivity.kt /tmp/MainActivity.kt.bak
+
+          # Run flutter create to generate gradle wrapper + local.properties
+          flutter create . --platforms=android --org com.growthos.app
+
+          # Restore our custom files (overwrite what flutter create just generated)
+          cp /tmp/app_build.gradle.bak android/app/build.gradle
+          cp /tmp/root_build.gradle.bak android/build.gradle
+          cp /tmp/settings.gradle.bak android/settings.gradle
+          cp /tmp/AndroidManifest.xml.bak android/app/src/main/AndroidManifest.xml
+          cp /tmp/MainActivity.kt.bak android/app/src/main/kotlin/com/growthos/app/MainActivity.kt
+
+          echo "✅ Gradle wrapper generated, custom Android config restored"
+          echo "--- android/app/build.gradle (minSdkVersion check) ---"
+          grep -E "minSdk|compileSdk|targetSdk" android/app/build.gradle
 
       - name: Get Dependencies
         run: flutter pub get
