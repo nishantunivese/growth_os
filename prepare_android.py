@@ -13,7 +13,7 @@ def patch_app_build_gradle():
         with open(kts_path, "r", encoding="utf-8") as f:
             content = f.read()
             
-        content = re.sub(r'compileSdk\s*=\s*(?:flutter\.compileSdkVersion|\d+)', 'compileSdk = 34', content)
+        content = re.sub(r'compileSdk\s*=\s*(?:flutter\.compileSdkVersion|\d+)', 'compileSdk = 36', content)
         content = re.sub(r'targetSdk\s*=\s*(?:flutter\.targetSdkVersion|\d+)', 'targetSdk = 34', content)
         content = re.sub(r'minSdk\s*=\s*(?:flutter\.minSdkVersion|\d+)', 'minSdk = 24', content)
         
@@ -32,17 +32,17 @@ def patch_app_build_gradle():
             
         with open(kts_path, "w", encoding="utf-8") as f:
             f.write(content)
-        print("Patched app/build.gradle.kts successfully!")
+        print("Patched app/build.gradle.kts with compileSdk=36, minSdk=24!")
         
     elif os.path.exists(groovy_path):
         print(f"Found Groovy DSL: {groovy_path}")
         with open(groovy_path, "r", encoding="utf-8") as f:
             content = f.read()
             
-        content = re.sub(r'compileSdkVersion\s+(?:flutter\.compileSdkVersion|\d+)', 'compileSdkVersion 34', content)
+        content = re.sub(r'compileSdkVersion\s+(?:flutter\.compileSdkVersion|\d+)', 'compileSdkVersion 36', content)
         content = re.sub(r'targetSdkVersion\s+(?:flutter\.targetSdkVersion|\d+)', 'targetSdkVersion 34', content)
         content = re.sub(r'minSdkVersion\s+(?:flutter\.minSdkVersion|\d+)', 'minSdkVersion 24', content)
-        content = re.sub(r'compileSdk\s+(?:flutter\.compileSdkVersion|\d+)', 'compileSdk 34', content)
+        content = re.sub(r'compileSdk\s+(?:flutter\.compileSdkVersion|\d+)', 'compileSdk 36', content)
         content = re.sub(r'minSdk\s+(?:flutter\.minSdkVersion|\d+)', 'minSdk 24', content)
         
         if "multiDexEnabled" not in content:
@@ -60,7 +60,7 @@ def patch_app_build_gradle():
             
         with open(groovy_path, "w", encoding="utf-8") as f:
             f.write(content)
-        print("Patched app/build.gradle successfully!")
+        print("Patched app/build.gradle with compileSdkVersion=36, minSdkVersion=24!")
 
 def patch_manifest():
     print("=== Patching AndroidManifest.xml ===")
@@ -118,20 +118,17 @@ def patch_manifest():
         sys.exit(1)
 
 def patch_pub_cache():
-    print("=== Patching pub-cache plugin build.gradle files ===")
+    print("=== Patching pub-cache plugin build.gradle files to compileSdk 36 ===")
     search_paths = []
     
-    # 1. ~/.pub-cache
     home_cache = os.path.expanduser("~/.pub-cache")
     if os.path.exists(home_cache):
         search_paths.append(home_cache)
         
-    # 2. $PUB_CACHE env var
     env_cache = os.environ.get("PUB_CACHE")
     if env_cache and os.path.exists(env_cache) and env_cache not in search_paths:
         search_paths.append(env_cache)
         
-    # 3. /home/runner/.pub-cache (GitHub Actions standard)
     gh_cache = "/home/runner/.pub-cache"
     if os.path.exists(gh_cache) and gh_cache not in search_paths:
         search_paths.append(gh_cache)
@@ -147,26 +144,26 @@ def patch_pub_cache():
                         with open(path, "r", encoding="utf-8") as f:
                             text = f.read()
                         
-                        # Replace compileSdkVersion 30, 31, 32, 33 with 34
+                        # Replace compileSdkVersion 28..35 with 36
                         new_text = re.sub(
-                            r'compileSdkVersion\s+(?:2[0-9]|3[0-3])\b',
-                            'compileSdkVersion 34',
+                            r'compileSdkVersion\s+(?:2[0-9]|3[0-5])\b',
+                            'compileSdkVersion 36',
                             text
                         )
                         new_text = re.sub(
-                            r'compileSdk\s*=\s*(?:2[0-9]|3[0-3])\b',
-                            'compileSdk = 34',
+                            r'compileSdk\s*=\s*(?:2[0-9]|3[0-5])\b',
+                            'compileSdk = 36',
                             new_text
                         )
                         if new_text != text:
                             with open(path, "w", encoding="utf-8") as f:
                                 f.write(new_text)
-                            print(f"  -> Upgraded compileSdk to 34 in: {file} ({os.path.basename(os.path.dirname(root))})")
+                            print(f"  -> Upgraded compileSdk to 36 in: {file} ({os.path.basename(os.path.dirname(root))})")
                             count += 1
                     except Exception:
                         pass
                         
-    print(f"=== Successfully patched {count} plugin files in pub-cache! ===")
+    print(f"=== Successfully patched {count} plugin files in pub-cache to compileSdk 36! ===")
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "--all"
