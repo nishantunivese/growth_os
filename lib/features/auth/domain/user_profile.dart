@@ -65,7 +65,26 @@ class UserProfile {
       'primary_category': primaryCategory,
       'preferred_currency': preferredCurrency,
       'time_zone': timeZone,
-      'is_admin': isAdmin,
+      'is_admin': isAdmin ? 1 : 0,
+      'streak_count': streakCount,
+    };
+  }
+
+  Map<String, dynamic> toLocalDbMap() {
+    return {
+      'id': id,
+      'full_name': fullName,
+      'business_name': businessName,
+      'avatar_url': avatarUrl,
+      'youtube_channel': youtubeChannel,
+      'instagram_username': instagramUsername,
+      'telegram_channel': telegramChannel,
+      'monthly_earning_target': monthlyEarningTarget,
+      'annual_earning_target': annualEarningTarget,
+      'primary_category': primaryCategory,
+      'preferred_currency': preferredCurrency,
+      'time_zone': timeZone,
+      'is_admin': isAdmin ? 1 : 0,
       'streak_count': streakCount,
     };
   }
