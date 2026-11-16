@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/database/local_db_service.dart';
 import '../domain/auth_provider.dart';
 import 'welcome_screen.dart';
 import '../../navigation/main_scaffold.dart';
+import '../../onboarding/presentation/onboarding_screen.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -58,10 +60,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     final authState = ref.read(authProvider);
     if (authState.status == AuthStatus.authenticated && authState.user != null) {
-      // Auto-login: User stays logged in even after closing and reopening the app
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainScaffold()),
-      );
+      // Check if onboarding has been completed
+      final onboardingDone = await LocalDbService.instance.isOnboardingCompleted();
+      if (!mounted) return;
+      if (onboardingDone) {
+        // Auto-login: User stays logged in even after closing and reopening the app
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MainScaffold()),
+        );
+      } else {
+        // First login — show onboarding guide
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        );
+      }
     } else {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const WelcomeScreen()),

@@ -50,7 +50,7 @@ class LocalDbService {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: (db, version) async {
         await _createAllTables(db);
         await _seedDefaultAdmin(db);
@@ -85,6 +85,17 @@ class LocalDbService {
               await db.execute(q);
             } catch (_) {}
           }
+        }
+        if (oldVersion < 4) {
+          // Add app_settings table for onboarding flag and future settings
+          try {
+            await db.execute('''
+              CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+              )
+            ''');
+          } catch (_) {}
         }
       },
     );
@@ -415,6 +426,14 @@ class LocalDbService {
         id INTEGER PRIMARY KEY,
         user_id TEXT,
         logged_in_at TEXT
+      )
+    ''');
+
+    // 22. App Settings (key-value store for onboarding flag etc.)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
       )
     ''');
   }
@@ -800,5 +819,27 @@ class LocalDbService {
       'payload': jsonEncode(payload),
       'created_at': DateTime.now().toIso8601String(),
     });
+  }
+
+  // --- App Settings (Onboarding flag, etc.) ---
+  Future<bool> isOnboardingCompleted() async {
+    try {
+      final db = await database;
+      final res = await db.query('app_settings', where: 'key = ?', whereArgs: ['onboarding_completed']);
+      if (res.isNotEmpty) {
+        return (res.first['value'] as String?) == '1';
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> setOnboardingCompleted() async {
+    try {
+      final db = await database;
+      await db.insert('app_settings', {'key': 'onboarding_completed', 'value': '1'},
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (_) {}
   }
 }
