@@ -96,5 +96,48 @@ class NotificationService {
       );
     } catch (_) {}
   }
+
+  Future<bool> requestPermissions() async {
+    try {
+      final android = _notificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (android != null) {
+        final granted = await android.requestNotificationsPermission();
+        return granted ?? false;
+      }
+    } catch (_) {}
+    return true;
+  }
+
+  Future<void> sendGoalReminder({required String platform, required String goalTitle}) async {
+    await showLocalNotification(
+      id: 101,
+      title: '🎯 Growth OS Goal Reminder',
+      body: 'Keep moving on "$goalTitle" ($platform). Consistent action creates success!',
+    );
+  }
+
+  Future<void> sendEarningReminder() async {
+    await showLocalNotification(
+      id: 102,
+      title: '💰 Daily Earning Ledger Reminder',
+      body: 'Did you make sales or complete client work today? Log your revenue in Growth OS!',
+    );
+  }
+
+  Future<void> sendWorkProofReminder({required String taskTitle}) async {
+    await showLocalNotification(
+      id: 103,
+      title: '💼 Work Proof Verification',
+      body: 'Task "$taskTitle" is pending proof submission. Upload proof to earn Gold Coins!',
+    );
+  }
+
+  Future<void> sendTestReminder() async {
+    await showLocalNotification(
+      id: 999,
+      title: '🚀 Growth OS Reminders Active',
+      body: 'Notifications are configured! You will receive daily goal, work and ledger alerts.',
+    );
+  }
 }
 

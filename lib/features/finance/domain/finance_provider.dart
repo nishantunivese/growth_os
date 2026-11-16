@@ -160,15 +160,21 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         }
       }
 
-      // Default monthly and yearly goals (only for demo user, empty for new users)
-      List<FinancialGoal> goals = [];
-      if (userId == 'demo-creator-id-001') {
+      // Load custom goals from SQLite for this user
+      final goalRows = await LocalDbService.instance.getGoals(userId: userId);
+      List<FinancialGoal> goals = goalRows.map((m) {
+        final g = FinancialGoal.fromMap(m);
+        return _calculateGoalProgress(g, incomes);
+      }).toList();
+
+      if (goals.isEmpty && userId == 'demo-creator-id-001') {
         final now = DateTime.now();
         goals = [
           FinancialGoal(
             id: 'goal-month-1',
             userId: userId,
             title: 'Monthly Earning Target',
+            platformName: 'All Platforms',
             period: GoalPeriod.monthly,
             targetAmount: 100000.0,
             currentAmount: incomes.fold(0.0, (sum, item) => sum + item.amount),
@@ -179,6 +185,7 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
             id: 'goal-year-1',
             userId: userId,
             title: 'Annual Scale Goal',
+            platformName: 'All Platforms',
             period: GoalPeriod.yearly,
             targetAmount: 1200000.0,
             currentAmount: incomes.fold(0.0, (sum, item) => sum + item.amount),
@@ -300,6 +307,43 @@ class FinanceNotifier extends StateNotifier<FinanceState> {
         );
       }
     }
+  }
+
+  FinancialGoal _calculateGoalProgress(FinancialGoal goal, List<IncomeEntry> incomes) {
+    double progress = 0.0;
+    for (var inc in incomes) {
+      if (inc.date.isAfter(goal.startDate.subtract(const Duration(seconds: 1))) &&
+          inc.date.isBefore(goal.endDate.add(const Duration(days: 1)))) {
+        if (goal.platformName == 'All Platforms' ||
+            inc.platformSource.trim().toLowerCase() == goal.platformName.trim().toLowerCase()) {
+          progress += inc.amount;
+        }
+      }
+    }
+    return FinancialGoal(
+      id: goal.id,
+      userId: goal.userId,
+      title: goal.title,
+      platformName: goal.platformName,
+      period: goal.period,
+      targetAmount: goal.targetAmount,
+      currentAmount: progress,
+      startDate: goal.startDate,
+      endDate: goal.endDate,
+      isCompleted: progress >= goal.targetAmount && goal.targetAmount > 0,
+    );
+  }
+
+  Future<void> addGoal(FinancialGoal goal) async {
+    await LocalDbService.instance.upsertGoal(goal.toMap());
+    final calculated = _calculateGoalProgress(goal, state.incomeEntries);
+    final updated = [calculated, ...state.goals.where((g) => g.id != goal.id)];
+    state = state.copyWith(goals: updated);
+  }
+
+  Future<void> deleteGoal(String goalId) async {
+    await LocalDbService.instance.deleteGoal(goalId);
+    state = state.copyWith(goals: state.goals.where((g) => g.id != goalId).toList());
   }
 }
 

@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/foundation.dart';
@@ -48,7 +50,7 @@ class LocalDbService {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await _createAllTables(db);
         await _seedDefaultAdmin(db);
@@ -70,6 +72,19 @@ class LocalDbService {
             } catch (_) {}
           }
           await _seedDefaultAdmin(db);
+        }
+        if (oldVersion < 3) {
+          final alterV3 = [
+            "ALTER TABLE goals ADD COLUMN platform_name TEXT DEFAULT 'All Platforms'",
+            "ALTER TABLE goals ADD COLUMN period TEXT DEFAULT 'monthly'",
+            "ALTER TABLE goals ADD COLUMN start_date TEXT",
+            "ALTER TABLE goals ADD COLUMN end_date TEXT",
+          ];
+          for (final q in alterV3) {
+            try {
+              await db.execute(q);
+            } catch (_) {}
+          }
         }
       },
     );
@@ -312,8 +327,12 @@ class LocalDbService {
         id TEXT PRIMARY KEY,
         user_id TEXT,
         title TEXT,
+        platform_name TEXT DEFAULT 'All Platforms',
+        period TEXT DEFAULT 'monthly',
         target_amount REAL,
         current_amount REAL,
+        start_date TEXT,
+        end_date TEXT,
         deadline TEXT,
         category TEXT,
         is_completed INTEGER DEFAULT 0,
@@ -723,6 +742,13 @@ class LocalDbService {
       'user_id': userId,
       'logged_in_at': DateTime.now().toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    // Redundant file-based persistence for instant auto-login on app restart
+    try {
+      final docDir = await getApplicationDocumentsDirectory();
+      final file = File(p.join(docDir.path, 'growth_os_active_session.txt'));
+      await file.writeAsString(userId);
+    } catch (_) {}
   }
 
   Future<String?> getActiveSessionUserId() async {
@@ -730,15 +756,34 @@ class LocalDbService {
     try {
       final res = await db.query('active_session', where: 'id = 1');
       if (res.isNotEmpty) {
-        return res.first['user_id'] as String?;
+        final uid = res.first['user_id'] as String?;
+        if (uid != null && uid.isNotEmpty) return uid;
       }
     } catch (_) {}
+
+    // Fallback to file-based session
+    try {
+      final docDir = await getApplicationDocumentsDirectory();
+      final file = File(p.join(docDir.path, 'growth_os_active_session.txt'));
+      if (await file.exists()) {
+        final uid = (await file.readAsString()).trim();
+        if (uid.isNotEmpty) return uid;
+      }
+    } catch (_) {}
+
     return null;
   }
 
   Future<void> clearActiveSession() async {
     final db = await database;
     await db.delete('active_session');
+    try {
+      final docDir = await getApplicationDocumentsDirectory();
+      final file = File(p.join(docDir.path, 'growth_os_active_session.txt'));
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
   }
 
   // --- Sync Queue ---

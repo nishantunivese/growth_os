@@ -17,9 +17,9 @@ class AdminPanelScreen extends ConsumerStatefulWidget {
 class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // Login form controllers
-  final _adminUserCtrl = TextEditingController(text: 'admin@growthos.app');
-  final _adminPassCtrl = TextEditingController(text: 'admin123');
+  // Login form controllers (strictly unpopulated for security)
+  final _adminUserCtrl = TextEditingController();
+  final _adminPassCtrl = TextEditingController();
   bool _obscurePass = true;
 
   // User search

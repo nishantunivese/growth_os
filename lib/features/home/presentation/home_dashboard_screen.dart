@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
+import '../../finance/domain/finance_models.dart';
 import '../../finance/domain/finance_provider.dart';
 import '../../finance/presentation/add_transaction_modal.dart';
 import '../../rewards/domain/reward_provider.dart';
@@ -791,55 +793,128 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
   }
 
   void _openCreateGoalDialog() {
-    final titleCtrl = TextEditingController();
+    final titleCtrl = TextEditingController(text: 'Monthly Platform Target');
     final targetCtrl = TextEditingController(text: '100000');
+    final customPlatCtrl = TextEditingController();
+    String selectedPlatform = 'YouTube';
+
+    final platformList = ['YouTube', 'Instagram', 'Freelance', 'Upwork', 'Course Sales', 'All Platforms', 'Custom'];
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.cardSurface,
-        title: const Text('Create Your First Goal', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Goal Title', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: titleCtrl,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-              decoration: const InputDecoration(hintText: 'e.g. ₹1 Lakh Monthly Run Rate'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          final isCustom = selectedPlatform == 'Custom';
+
+          return AlertDialog(
+            backgroundColor: AppColors.cardSurface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            title: const Row(
+              children: [
+                Icon(Icons.flag_rounded, color: AppColors.primary, size: 22),
+                SizedBox(width: 8),
+                Text('Create Your First Goal', style: TextStyle(color: Colors.white, fontSize: 16)),
+              ],
             ),
-            const SizedBox(height: 14),
-            const Text('Target Amount (₹)', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: targetCtrl,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-              decoration: const InputDecoration(hintText: '100000'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Goal Title', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: titleCtrl,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: const InputDecoration(hintText: 'e.g. YouTube AdSense Target'),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text('Platform Name', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: platformList.map((p) {
+                      final isSel = selectedPlatform == p;
+                      return ChoiceChip(
+                        label: Text(p),
+                        selected: isSel,
+                        onSelected: (val) {
+                          if (val) setDialogState(() => selectedPlatform = p);
+                        },
+                        selectedColor: AppColors.primary,
+                        backgroundColor: AppColors.background,
+                        labelStyle: TextStyle(
+                          color: isSel ? Colors.white : AppColors.textSecondary,
+                          fontSize: 11,
+                          fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  if (isCustom) ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: customPlatCtrl,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: const InputDecoration(hintText: 'Enter platform name (e.g. TikTok, Substack)'),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+
+                  const Text('Target Amount (₹)', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: targetCtrl,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: const InputDecoration(hintText: '100000', prefixText: '₹ '),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final target = double.tryParse(targetCtrl.text) ?? 100000.0;
-              final current = ref.read(authProvider).user;
-              if (current != null) {
-                await ref.read(authProvider.notifier).updateProfile(
-                  current.copyWith(monthlyEarningTarget: target),
-                );
-              }
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(backgroundColor: AppColors.emeraldGreen, content: Text('Goal target set successfully!')),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.electricPurple),
-            child: const Text('Save Goal', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () async {
+                  final target = double.tryParse(targetCtrl.text) ?? 100000.0;
+                  final title = titleCtrl.text.trim().isNotEmpty ? titleCtrl.text.trim() : 'Growth Goal';
+                  final plat = isCustom ? customPlatCtrl.text.trim() : selectedPlatform;
+                  final platformName = plat.isNotEmpty ? plat : 'All Platforms';
+
+                  final current = ref.read(authProvider).user;
+                  if (current != null) {
+                    await ref.read(authProvider.notifier).updateProfile(
+                      current.copyWith(monthlyEarningTarget: target),
+                    );
+
+                    final newGoal = FinancialGoal(
+                      id: const Uuid().v4(),
+                      userId: current.id,
+                      title: title,
+                      platformName: platformName,
+                      period: GoalPeriod.monthly,
+                      targetAmount: target,
+                      startDate: DateTime.now(),
+                      endDate: DateTime.now().add(const Duration(days: 30)),
+                    );
+                    await ref.read(financeProvider.notifier).addGoal(newGoal);
+                  }
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: AppColors.emeraldGreen,
+                      content: Text('Goal "$title" for $platformName created successfully! 🎯'),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.electricPurple),
+                child: const Text('Save Goal', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -10,6 +10,7 @@ class FinancialGoal {
   final String id;
   final String userId;
   final String title;
+  final String platformName; // YouTube, Instagram, Freelance, Upwork, Course sales, Client, All Platforms
   final GoalPeriod period;
   final double targetAmount;
   final double currentAmount;
@@ -21,6 +22,7 @@ class FinancialGoal {
     required this.id,
     required this.userId,
     required this.title,
+    this.platformName = 'All Platforms',
     required this.period,
     required this.targetAmount,
     this.currentAmount = 0.0,
@@ -37,11 +39,15 @@ class FinancialGoal {
       'id': id,
       'user_id': userId,
       'title': title,
+      'platform_name': platformName,
       'period': period.name,
       'target_amount': targetAmount,
       'current_amount': currentAmount,
       'start_date': startDate.toIso8601String(),
       'end_date': endDate.toIso8601String(),
+      'deadline': endDate.toIso8601String(),
+      'category': platformName,
+      'created_at': startDate.toIso8601String(),
       'is_completed': isCompleted ? 1 : 0,
     };
   }
@@ -51,14 +57,19 @@ class FinancialGoal {
       id: map['id'] ?? '',
       userId: map['user_id'] ?? '',
       title: map['title'] ?? '',
+      platformName: map['platform_name'] ?? map['category'] ?? 'All Platforms',
       period: GoalPeriod.values.firstWhere(
         (e) => e.name == map['period'],
         orElse: () => GoalPeriod.monthly,
       ),
       targetAmount: (map['target_amount'] as num?)?.toDouble() ?? 0.0,
       currentAmount: (map['current_amount'] as num?)?.toDouble() ?? 0.0,
-      startDate: map['start_date'] != null ? DateTime.parse(map['start_date']) : DateTime.now(),
-      endDate: map['end_date'] != null ? DateTime.parse(map['end_date']) : DateTime.now().add(const Duration(days: 30)),
+      startDate: map['start_date'] != null
+          ? (DateTime.tryParse(map['start_date']) ?? DateTime.now())
+          : (map['created_at'] != null ? DateTime.tryParse(map['created_at']) ?? DateTime.now() : DateTime.now()),
+      endDate: map['end_date'] != null
+          ? (DateTime.tryParse(map['end_date']) ?? DateTime.now().add(const Duration(days: 30)))
+          : (map['deadline'] != null ? DateTime.tryParse(map['deadline']) ?? DateTime.now().add(const Duration(days: 30)) : DateTime.now().add(const Duration(days: 30))),
       isCompleted: map['is_completed'] == 1 || map['is_completed'] == true,
     );
   }

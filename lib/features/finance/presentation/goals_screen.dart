@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/report_export_service.dart';
 import '../../auth/domain/auth_provider.dart';
@@ -118,6 +120,14 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                         ),
                       ],
                     ),
+                  ),
+                ),
+
+                // 2B. Platform & Custom Goals Section (with Platform Name support)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: _buildPlatformGoalsSection(financeState),
                   ),
                 ),
 
@@ -304,6 +314,557 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPlatformGoalsSection(FinanceState financeState) {
+    final goals = financeState.goals;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Platform Goals',
+                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                if (goals.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+                    ),
+                    child: Text(
+                      '${goals.length}',
+                      style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            TextButton.icon(
+              onPressed: () => _showAddGoalModal(context),
+              icon: const Icon(Icons.add_circle_outline, size: 16, color: AppColors.primary),
+              label: const Text('Add Goal', style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.bold)),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (goals.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.cardBorder),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.flag_outlined, color: AppColors.primary, size: 36),
+                const SizedBox(height: 8),
+                const Text(
+                  'No Platform Goals Yet',
+                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Set target earnings for YouTube, Instagram, Freelancing, Upwork, or Courses.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () => _showAddGoalModal(context),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Create Your First Goal'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: goals.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (ctx, i) {
+              final goal = goals[i];
+              return _buildPlatformGoalCard(goal);
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPlatformGoalCard(FinancialGoal goal) {
+    final pct = (goal.progressPercentage / 100.0).clamp(0.0, 1.0);
+    final isDone = goal.isCompleted || pct >= 1.0;
+
+    // Platform theme coloring and badge
+    Color platformColor = AppColors.primary;
+    IconData platformIcon = Icons.public;
+    final platLower = goal.platformName.toLowerCase();
+    if (platLower.contains('youtube')) {
+      platformColor = const Color(0xFFFF0000);
+      platformIcon = Icons.smart_display;
+    } else if (platLower.contains('instagram')) {
+      platformColor = const Color(0xFFE1306C);
+      platformIcon = Icons.camera_alt;
+    } else if (platLower.contains('freelance') || platLower.contains('upwork')) {
+      platformColor = const Color(0xFF14A800);
+      platformIcon = Icons.work_outline;
+    } else if (platLower.contains('course') || platLower.contains('education')) {
+      platformColor = const Color(0xFF9C27B0);
+      platformIcon = Icons.school_outlined;
+    } else if (platLower.contains('client') || platLower.contains('agency')) {
+      platformColor = const Color(0xFF00ACC1);
+      platformIcon = Icons.business_center_outlined;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDone ? AppColors.success.withOpacity(0.5) : AppColors.cardBorder,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Platform badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: platformColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: platformColor.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(platformIcon, size: 13, color: platformColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      goal.platformName,
+                      style: TextStyle(
+                        color: platformColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Period chip
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  goal.period.name.toUpperCase(),
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 9, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const Spacer(),
+              if (isDone)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, color: AppColors.success, size: 12),
+                      SizedBox(width: 3),
+                      Text('Achieved!', style: TextStyle(color: AppColors.success, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textSecondary),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: AppColors.surface,
+                      title: const Text('Delete Goal?', style: TextStyle(color: Colors.white)),
+                      content: Text('Are you sure you want to delete "${goal.title}"?', style: const TextStyle(color: AppColors.textSecondary)),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Delete', style: TextStyle(color: AppColors.danger)),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    await ref.read(financeProvider.notifier).deleteGoal(goal.id);
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            goal.title,
+            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '₹${goal.currentAmount.toStringAsFixed(0)} / ₹${goal.targetAmount.toStringAsFixed(0)}',
+                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                '${goal.progressPercentage.toStringAsFixed(1)}%',
+                style: TextStyle(
+                  color: isDone ? AppColors.success : platformColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 6,
+              backgroundColor: AppColors.cardBorder,
+              valueColor: AlwaysStoppedAnimation<Color>(isDone ? AppColors.success : platformColor),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isDone
+                ? 'Goal Target reached! Outstanding work! 🎉'
+                : '₹${goal.remainingAmount.toStringAsFixed(0)} remaining to reach target',
+            style: TextStyle(
+              color: isDone ? AppColors.success : AppColors.textSecondary,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddGoalModal(BuildContext context) {
+    final titleCtrl = TextEditingController();
+    final amountCtrl = TextEditingController();
+    final customPlatformCtrl = TextEditingController();
+    String selectedPlatform = 'YouTube';
+    GoalPeriod selectedPeriod = GoalPeriod.monthly;
+    DateTime selectedEndDate = DateTime.now().add(const Duration(days: 30));
+
+    final platforms = [
+      'YouTube',
+      'Instagram',
+      'Freelance',
+      'Upwork',
+      'Course Sales',
+      'Client Projects',
+      'All Platforms',
+      'Custom',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final isCustom = selectedPlatform == 'Custom';
+
+            return Container(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
+              ),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Add New Financial Goal',
+                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                          onPressed: () => Navigator.pop(modalCtx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Goal Title
+                    const Text('Goal Title', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: titleCtrl,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'e.g. YouTube AdSense Target, Course Launch',
+                        hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                        filled: true,
+                        fillColor: AppColors.cardSurface,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Platform Name Option
+                    const Text('Platform Name', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: platforms.map((p) {
+                        final isSel = selectedPlatform == p;
+                        return ChoiceChip(
+                          label: Text(p),
+                          selected: isSel,
+                          onSelected: (val) {
+                            if (val) setModalState(() => selectedPlatform = p);
+                          },
+                          selectedColor: AppColors.primary,
+                          backgroundColor: AppColors.cardSurface,
+                          labelStyle: TextStyle(
+                            color: isSel ? Colors.white : AppColors.textSecondary,
+                            fontSize: 11,
+                            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    if (isCustom) ...[
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: customPlatformCtrl,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Enter Custom Platform Name (e.g. TikTok, Substack)',
+                          hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                          filled: true,
+                          fillColor: AppColors.cardSurface,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+
+                    // Target Amount
+                    const Text('Target Amount (₹)', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: amountCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 50000',
+                        hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                        prefixText: '₹ ',
+                        prefixStyle: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                        filled: true,
+                        fillColor: AppColors.cardSurface,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Goal Period & Target Date
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Period', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.cardSurface,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<GoalPeriod>(
+                                    value: selectedPeriod,
+                                    dropdownColor: AppColors.cardSurface,
+                                    isExpanded: true,
+                                    items: GoalPeriod.values.map((gp) {
+                                      return DropdownMenuItem(
+                                        value: gp,
+                                        child: Text(
+                                          gp.name[0].toUpperCase() + gp.name.substring(1),
+                                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (val) {
+                                      if (val != null) setModalState(() => selectedPeriod = val);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Target Date', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                              const SizedBox(height: 6),
+                              InkWell(
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: modalCtx,
+                                    initialDate: selectedEndDate,
+                                    firstDate: DateTime.now(),
+                                    lastDate: DateTime.now().add(const Duration(days: 1825)),
+                                  );
+                                  if (picked != null) {
+                                    setModalState(() => selectedEndDate = picked);
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.cardSurface,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        DateFormat('dd MMM yyyy').format(selectedEndDate),
+                                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                                      ),
+                                      const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Submit Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () async {
+                          final title = titleCtrl.text.trim();
+                          final amount = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
+                          final plat = isCustom ? customPlatformCtrl.text.trim() : selectedPlatform;
+
+                          if (title.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please enter a goal title')),
+                            );
+                            return;
+                          }
+                          if (amount <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Please enter a valid target amount')),
+                            );
+                            return;
+                          }
+
+                          final authState = ref.read(authProvider);
+                          final userId = authState.user?.id ?? 'user_${DateTime.now().millisecondsSinceEpoch}';
+
+                          final newGoal = FinancialGoal(
+                            id: const Uuid().v4(),
+                            userId: userId,
+                            title: title,
+                            platformName: plat.isNotEmpty ? plat : 'All Platforms',
+                            period: selectedPeriod,
+                            targetAmount: amount,
+                            startDate: DateTime.now(),
+                            endDate: selectedEndDate,
+                          );
+
+                          await ref.read(financeProvider.notifier).addGoal(newGoal);
+                          if (modalCtx.mounted) Navigator.pop(modalCtx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: AppColors.success,
+                              content: Text('Goal "$title" created for $plat! 🎯'),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Save Financial Goal',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

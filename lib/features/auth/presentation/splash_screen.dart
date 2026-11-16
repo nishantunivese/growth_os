@@ -39,11 +39,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _checkAuth() async {
-    await Future.delayed(const Duration(milliseconds: 1800));
+    final animWait = Future.delayed(const Duration(milliseconds: 1400));
+
+    // Poll until AuthState is resolved from background SQLite/file check
+    int checks = 0;
+    while (checks < 40) {
+      final status = ref.read(authProvider).status;
+      if (status != AuthStatus.initial && status != AuthStatus.loading) {
+        break;
+      }
+      await Future.delayed(const Duration(milliseconds: 100));
+      checks++;
+      if (!mounted) return;
+    }
+
+    await animWait;
     if (!mounted) return;
 
     final authState = ref.read(authProvider);
-    if (authState.status == AuthStatus.authenticated) {
+    if (authState.status == AuthStatus.authenticated && authState.user != null) {
+      // Auto-login: User stays logged in even after closing and reopening the app
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MainScaffold()),
       );
